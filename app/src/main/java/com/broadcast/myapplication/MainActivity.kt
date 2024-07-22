@@ -1,12 +1,15 @@
 package com.broadcast.myapplication
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.broadcast.myapplication.adapter.AdapterInteractionListener
 import com.broadcast.myapplication.adapter.FingerprintAdapter
 import com.broadcast.myapplication.adapter.Item
 import com.broadcast.myapplication.adapter.animations.AddableItemAnimator
@@ -20,6 +23,7 @@ import com.broadcast.myapplication.adapter.fingerprints.PostFingerprint
 import com.broadcast.myapplication.adapter.fingerprints.TitleFingerprint
 import com.broadcast.myapplication.databinding.ActivityMainBinding
 import com.broadcast.myapplication.model.FeedTitle
+import com.broadcast.myapplication.model.HorizontalItems
 import com.broadcast.myapplication.model.UserPost
 import com.broadcast.myapplication.utils.SwipeToDelete
 import com.broadcast.myapplication.utils.getRandomFeed
@@ -29,32 +33,20 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
-    private val titlesList: MutableList<Item> by lazy {
-        MutableList(1) { FeedTitle("Актуальное за сегодня:") }
-    }
     private val postsList: MutableList<Item> by lazy {
         getRandomFeed(this)
     }
-
-    private val titleAdapter = FingerprintAdapter(listOf(TitleFingerprint()))
-    private val postAdapter = FingerprintAdapter(
-        listOf(
-            PostFingerprint(::onSavePost),
-            HorizontalItemsFingerprint(
-                listOf(PostFingerprint(::onSavePost, 600)),
-                70,
-                RecyclerView.RecycledViewPool()
-            )
+    private val fingerprints = listOf(
+        TitleFingerprint(),
+        PostFingerprint(::onSavePost),
+        HorizontalItemsFingerprint(
+            70,
+            RecyclerView.RecycledViewPool(),
+            ::onSavePost
         )
     )
+    var oldList = listOf<Item>()
 
-    private val concatAdapter = ConcatAdapter(
-        ConcatAdapter.Config.Builder()
-            .setIsolateViewTypes(false)
-            .build(),
-        titleAdapter,
-        postAdapter
-    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,12 +55,23 @@ class MainActivity : AppCompatActivity() {
 
         with(binding.recyclerView) {
             layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = concatAdapter
 
-            addItemDecoration(FeedHorizontalDividerItemDecoration(70, listOf(R.layout.item_horizontal_list))) // addable
-            addItemDecoration(GroupVerticalItemDecoration(R.layout.item_post, 100, 0)) // addable
-            addItemDecoration(GroupVerticalItemDecoration(R.layout.item_title, 0, 100)) // addable
-            addItemDecoration(GroupVerticalItemDecoration(R.layout.item_horizontal_list, 0, 150)) // addable
+            addFingerprint(fingerprints)
+            postsList.add(0, FeedTitle("Актуальное за сегодня:"))
+            addItemDecoration(
+                FeedHorizontalDividerItemDecoration(70, listOf(R.layout.item_horizontal_list)),
+                GroupVerticalItemDecoration(R.layout.item_post, 100, 0),
+                GroupVerticalItemDecoration(R.layout.item_title, 0, 100),
+                GroupVerticalItemDecoration(R.layout.item_horizontal_list, 0, 150),
+            ) // addable
+
+            dataSource(object : AdapterDataSource {
+                override fun getItemCount() = postsList.size
+
+                override fun getItemByPosition(position: Int): Item = postsList.get(position)
+
+                override fun getItems(): List<Item> = postsList
+            })
 
             itemAnimator = AddableItemAnimator(SimpleCommonAnimator()).also { animator ->
                 animator.addViewTypeAnimation(R.layout.item_post, SlideInLeftCommonAnimator())
@@ -76,25 +79,54 @@ class MainActivity : AppCompatActivity() {
                 animator.addDuration = 500L
                 animator.removeDuration = 500L
             }
+
+            update()
         }
 
         initSwipeToDelete()
         submitInitialListWithDelayForAnimation()
     }
 
-    private fun onSavePost(post: UserPost) {
-        val postIndex = postsList.indexOf(post)
-        val newItem = post.copy(isSaved = post.isSaved.not())
+    private fun onSavePost(adapterPosition: Int) {
+        val post = postsList.getOrNull(adapterPosition)
+        if (post != null && post is UserPost) {
+            Log.e("anime", postsList.toString())
+            val newItem = post.copy(isSaved = post.isSaved.not())
 
-        postsList.removeAt(postIndex)
-        postsList.add(postIndex, newItem)
-        postAdapter.submitList(postsList.toList())
+            postsList.removeAt(index = adapterPosition)
+            postsList.add(adapterPosition, newItem)
+            update()
+        }
     }
+
+    private fun onSavePost(outAdapterPosition: Int, innerAdapterPosition: Int) {
+        val horizontalItems = postsList.getOrNull(outAdapterPosition)
+
+        if (horizontalItems != null && horizontalItems is HorizontalItems) {
+            Log.e("anime", "outPos: $outAdapterPosition, innerPos: $innerAdapterPosition")
+            val post =
+                (horizontalItems.items.getOrNull(innerAdapterPosition) as? UserPost) ?: return
+
+            val newItem = post.copy(isSaved = post.isSaved.not())
+            horizontalItems.items.removeAt(index = innerAdapterPosition)
+            horizontalItems.items.add(innerAdapterPosition, newItem)
+
+            val horizontal = horizontalItems.copy(isChange = horizontalItems.isChange.not())
+
+            postsList.removeAt(outAdapterPosition)
+            postsList.add(outAdapterPosition, horizontal)
+
+            Log.e("anime", postsList.contains(horizontal).toString())
+            update()
+            binding.recyclerView.print()
+        }
+    }
+
 
     private fun submitInitialListWithDelayForAnimation() {
         binding.recyclerView.postDelayed({
-            titleAdapter.submitList(titlesList.toList())
-            postAdapter.submitList(postsList.toList())
+//            titleAdapter.submitList(titlesList.toList())
+//            postAdapter.submitList(postsList.toList())
         }, 300L)
     }
 
@@ -102,7 +134,7 @@ class MainActivity : AppCompatActivity() {
         val onItemSwipedToDelete = { positionForRemove: Int ->
             val removedItem = postsList[positionForRemove]
             postsList.removeAt(positionForRemove)
-            postAdapter.submitList(postsList.toList())
+//            postAdapter.submitList(postsList.toList())
 
             showRestoreItemSnackbar(positionForRemove, removedItem)
 
@@ -114,8 +146,15 @@ class MainActivity : AppCompatActivity() {
     private fun showRestoreItemSnackbar(position: Int, item: Item) {
         Snackbar.make(binding.recyclerView, "Item was deleted", Snackbar.LENGTH_LONG)
             .setAction("Undo") {
-                postsList.add(position, item)
-                postAdapter.submitList(postsList.toList())
+//                postsList.add(position, item)
+//                postAdapter.submitList(postsList.toList())
             }.show()
+    }
+
+    fun update() {
+        val fingerprintDiffUtil =
+            FingerprintDiffUtil(fingerprints, oldList, postsList)
+        oldList = postsList.toList()
+        binding.recyclerView.update(fingerprintDiffUtil)
     }
 }

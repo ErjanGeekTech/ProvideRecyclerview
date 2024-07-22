@@ -16,31 +16,25 @@ class TitleFingerprint : ItemFingerprint<ItemTitleBinding, FeedTitle> {
 
     override fun getLayoutId() = R.layout.item_title
 
-    override fun getViewHolder(
+    override fun getViewBinding(
         layoutInflater: LayoutInflater,
         parent: ViewGroup
-    ): BaseViewHolder<ItemTitleBinding, FeedTitle> {
-        val binding = ItemTitleBinding.inflate(layoutInflater, parent, false)
-        return TitleViewHolder(binding)
-    }
+    ) = ItemTitleBinding.inflate(layoutInflater, parent, false)
+
 
     override fun getDiffUtil() = diffUtil
 
     private val diffUtil = object : DiffUtil.ItemCallback<FeedTitle>() {
-        override fun areItemsTheSame(oldItem: FeedTitle, newItem: FeedTitle) = oldItem.title == oldItem.title
+        override fun areItemsTheSame(oldItem: FeedTitle, newItem: FeedTitle) =
+            oldItem.title == newItem.title
 
-        override fun areContentsTheSame(oldItem: FeedTitle, newItem: FeedTitle) = oldItem == oldItem
+        override fun areContentsTheSame(oldItem: FeedTitle, newItem: FeedTitle) = oldItem == newItem
     }
 
-}
-
-class TitleViewHolder(
-    binding: ItemTitleBinding
-) : BaseViewHolder<ItemTitleBinding, FeedTitle>(binding) {
-
-    override fun onBind(item: FeedTitle) {
-        super.onBind(item)
-        binding.tvFeedTitle.text = item.title
-    }
-
+    override fun initBlock(viewHolder: BaseViewHolder<ItemTitleBinding, FeedTitle>) =
+        with(viewHolder) {
+            bind { item ->
+                binding.tvFeedTitle.text = item.title
+            }
+        }
 }

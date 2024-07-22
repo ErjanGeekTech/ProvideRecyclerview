@@ -7,19 +7,20 @@ import android.text.SpannableStringBuilder
 import android.text.style.StyleSpan
 import androidx.core.content.ContextCompat
 import com.broadcast.myapplication.R
+import com.broadcast.myapplication.adapter.Item
 import com.broadcast.myapplication.model.HorizontalItems
 import com.broadcast.myapplication.model.UserPost
 import kotlin.random.Random
 
-fun getRandomFeed(context: Context) = MutableList(20) {
+fun getRandomFeed(context: Context) = MutableList<Item>(20) {
     when (it) {
-        1, 6, 7, 8, 14, 15 -> getRandomHorizontalItems(context)
+        1,2,3, 8, 14, 15 -> getRandomHorizontalItems(context)
         else -> getRandomUserPost(context)
     }
 }
 
 fun getRandomHorizontalItems(context: Context) = HorizontalItems(
-    List(10) { getRandomUserPost(context) }
+    List(10) { getRandomUserPost(context) }.toMutableList()
 )
 
 fun getRandomUserPost(context: Context) = UserPost(

@@ -3,18 +3,28 @@ package com.broadcast.myapplication.adapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 
-abstract class BaseViewHolder<out V : ViewBinding, I : Item>(
+class BaseViewHolder<out V : ViewBinding, I : Item>(
     val binding: V
 ) : RecyclerView.ViewHolder(binding.root) {
 
-    lateinit var item: I
+    var _bind: ((item: I) -> Unit)? = null
+        private set
 
-    open fun onBind(item: I) {
-        this.item = item
+    var _bindPayloads: ((item: I, payloads: List<Any>) -> Unit)? = null
+        private set
+
+    fun bind(bindingBlock: (item: I) -> Unit) {
+        if (_bind != null) {
+            throw IllegalStateException("bind { ... } is already defined. Only one bind { ... } is allowed.")
+        }
+        _bind = bindingBlock
     }
 
-    open fun onBind(item: I, payloads: List<Any>) {
-        this.item = item
+    fun bind(bindingBlock: (item: I, payloads: List<Any>) -> Unit) {
+        if (_bindPayloads != null) {
+            throw IllegalStateException("bind { ... } is already defined. Only one bind { ... } is allowed.")
+        }
+        _bindPayloads = bindingBlock
     }
 
     open fun onViewDetached() = Unit
